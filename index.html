@@ -319,6 +319,11 @@ html.sheet-open, html.sheet-open body{ overflow:hidden; }
 .install h3{ font-size:1.1rem; font-weight:600; margin:1rem 0 .2rem; }
 .install p{ margin:0 0 .6rem; }
 @media (max-width:400px){ .tabbar button{ font-size:1rem; } .coin b{ font-size:1.15rem; } }
+.profs{ display:grid; grid-template-columns:auto 1fr; gap:.35rem 1rem; margin:0; padding:.7rem .25rem; border-top:1px solid var(--line); border-bottom:1px solid var(--line); width:100%; text-align:left; }
+.profs dt{ color:var(--ink-soft); font-size:1rem; padding-top:.1rem; }
+.profs dd{ margin:0; overflow-wrap:anywhere; }
+.profs dd.none{ color:var(--ink-soft); font-style:italic; }
+@media (max-width:480px){ .profs{ grid-template-columns:1fr; gap:0; } .profs dd{ margin-bottom:.45rem; } }
 .toast{ position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); z-index:30; max-width:calc(100% - 2rem);
   background:var(--ink); color:var(--bg); padding:.6rem 1rem; border-radius:4px; font-size:1rem; box-shadow:0 6px 20px var(--shadow); }
 .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
@@ -449,7 +454,7 @@ const MASTERY = {
   "Sape": () => "Si tu touches, la créature a le Désavantage à son prochain jet d'attaque avant le début de ton prochain tour."
 };
 const DTYPES = ["acide","contondants","feu","force","foudre","froid","nécrotiques","perforants","poison","psychiques","radiants","tonnerre","tranchants"];
-const FEAT_TIMES = [["action","Action"],["bonus","Action bonus"],["reaction","Réaction"],["other","Autre (passive, hors combat)"]];
+const FEAT_TIMES = [["action","Action"],["bonus","Action bonus"],["reaction","Réaction"],["other","Hors combat (onglet Carac.)"]];
 const RECHARGE = {short:"Repos court", long:"Repos long", none:"Ne se recharge pas"};
 
 /* --- Sac et états --- */
@@ -477,6 +482,8 @@ const CONDITIONS = [
   {k:"petrifie", n:"Pétrifié", inc:true, still:true, t:"Changé en pierre : neutralisé, vitesse 0, échec automatique aux sauvegardes de Force et de Dextérité. Résistance à tous les dégâts, immunité au poison, avantage aux attaques contre toi."}
 ];
 const COND_BY = Object.fromEntries(CONDITIONS.map(x => [x.k, x]));
+const PROF_FIELDS = [["armor","Armures","Armures légères, intermédiaires, boucliers"],["weapons","Armes","Armes courantes, armes de guerre"],
+  ["tools","Outils","Outils de voleur, kit d'herboriste, luth…"],["languages","Langues","Commun, elfique, draconique…"]];
 const TABS = ["stats", "combat", "spells", "bag", "notes"];
 const VIEW_KEY = "miroir.view";
 const EXPORT_KEY = "miroir.lastExport";
@@ -509,6 +516,7 @@ function defaults(){
     speed: 9,
     overrides: {},           // clé calculée -> valeur forcée
     notes: "",
+    profs: {armor:"", weapons:"", tools:"", languages:""},   // maîtrises et langues
     portrait: "",            // photo recadrée (data URL JPEG)
     spellcasting: {ability: null},   // null = d'après la classe
     spells: [],
@@ -550,6 +558,8 @@ function migrate(raw){
   c.hitDice = {}; for (const z of [6, 8, 10, 12]){ const u = parseInt(rh[z]) || 0; if (u > 0) c.hitDice[z] = clamp(u, 0, 20); }
   const rcd = Array.isArray(raw && raw.conditions) ? raw.conditions : [];
   c.conditions = CONDITIONS.map(x => x.k).filter(k => rcd.includes(k));
+  const rp = (raw && raw.profs) || {};
+  c.profs = {}; for (const [k] of PROF_FIELDS) c.profs[k] = String(rp[k] ?? "").trim().slice(0, 2000);
   c.schema = SCHEMA;
   return c;
 }
@@ -863,7 +873,8 @@ function renderSheet(c){
         </div>
         ${exhNote ? `<p class="exh-note">${exhNote}</p>` : ""}
       </div>
-      <div class="abilities">${ABILITIES.map(a => renderAbility(c, d, a)).join("")}</div>`;
+      <div class="abilities">${ABILITIES.map(a => renderAbility(c, d, a)).join("")}</div>
+      ${renderTraits(c)}`;
   }
   return `
     <nav class="topbar">
@@ -1826,10 +1837,10 @@ function renderCombat(c, d){
   const reaction = `
     <div class="sec-head"><h2>Réaction</h2>${tog("r", "Réaction")}</div>
     ${list([oa])}${grp("Sorts", sp("reaction"))}${grp("Capacités", ft("reaction"))}`;
-  const other = ft("other");
+  const nOther = cb.features.filter(f => f.time === "other").length;
   const caps = `
-    <div class="sec-head"><h2>Autres capacités</h2><button class="btn btn-primary" data-action="feat-add">Ajouter une capacité</button></div>
-    ${other.length ? list(other) : `<p class="hint">Traits d'espèce, capacités de classe, dons… Range une capacité en action, action bonus ou réaction pour la retrouver plus haut, ou en « Autre » pour la garder ici. Ses utilisations se rechargent au repos.</p>`}`;
+    <div class="sec-head"><h2>Capacités</h2><button class="btn btn-primary" data-action="feat-add" data-time="action">Ajouter une capacité</button></div>
+    <p class="hint">Rage, Second souffle, Souffle draconique… Range une capacité en action, action bonus ou réaction pour la retrouver dans la bonne section ci-dessus. Les capacités hors combat${nOther ? ` (${nOther})` : ""} sont dans l'onglet Caractéristiques.</p>`;
   const rest = `<div class="sec-head"><h2>Repos</h2></div>
     <ul class="slots hd-rows">${hitDicePool(c).map(hdRow).join("")}</ul>
     <p class="hint">Au repos court, dépense tes dés de vie pour récupérer des PV. Le repos long les rend tous.</p>
@@ -2100,15 +2111,15 @@ function sheetWeapon(id){
 }
 
 /* --- Capacités --- */
-function sheetFeature(id){
+function sheetFeature(id, time){
   const c = current(); if (!c) return;
   const ex = id && c.combat.features.find(x => x.id === id);
-  const f = ex ? Object.assign({}, ex) : normFeature({});
+  const f = ex ? Object.assign({}, ex) : normFeature({time: time || "other"});
   openSheet(`
     <h2>${ex ? "Modifier la capacité" : "Nouvelle capacité"}</h2>
     <form id="f-feat">
-      <label class="field"><span>Nom</span><input class="input" name="name" value="${esc(f.name)}" required autocomplete="off" placeholder="Rage, Second souffle, Souffle draconique…"></label>
-      <label class="field"><span>Rangée en combat dans</span><select class="input" name="time">
+      <label class="field"><span>Nom</span><input class="input" name="name" value="${esc(f.name)}" required autocomplete="off" placeholder="${f.time === "other" ? "Vision dans le noir, Expert en rituels…" : "Rage, Second souffle…"}"></label>
+      <label class="field"><span>Rangée dans</span><select class="input" name="time">
         ${FEAT_TIMES.map(([k, l]) => `<option value="${k}" ${f.time === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <div class="cols">
         <label class="field"><span>Utilisations</span><input class="input" name="max" type="number" inputmode="numeric" min="0" max="99" value="${f.max}">
@@ -2438,6 +2449,40 @@ function sheetInstall(){
   </div>`);
 }
 
+/* ================= Maîtrises, langues, capacités hors combat ================= */
+function renderTraits(c){
+  ensureCombatView();
+  const dl = PROF_FIELDS.map(([k, l]) => `<dt>${l}</dt>${c.profs[k] ? `<dd>${esc(c.profs[k])}</dd>` : `<dd class="none">À remplir</dd>`}`).join("");
+  const other = c.combat.features.filter(f => f.time === "other")
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr")).map(featItem);
+  return `
+    <div class="sec-head"><h2>Maîtrises et langues</h2><button class="btn" data-action="profs">Modifier</button></div>
+    <dl class="profs">${dl}</dl>
+    <div class="sec-head"><h2>Capacités hors combat</h2><button class="btn btn-primary" data-action="feat-add" data-time="other">Ajouter</button></div>
+    ${other.length ? `<ul class="spells cb-list">${other.join("")}</ul>`
+      : `<p class="hint">Traits d'espèce, capacités de classe, dons, historique : Vision dans le noir, Expert en rituels, Chanceux… Celles qui servent en combat se rangent en action, action bonus ou réaction et apparaissent dans l'onglet Combat.</p>`}`;
+}
+function sheetProfs(){
+  const c = current(); if (!c) return;
+  openSheet(`
+    <h2>Maîtrises et langues</h2>
+    <form id="f-profs">
+      ${PROF_FIELDS.map(([k, l, ph]) => `<label class="field"><span>${l}</span><textarea class="input" name="${k}" rows="2" style="min-height:4.5rem" placeholder="${esc(ph)}">${esc(c.profs[k])}</textarea></label>`).join("")}
+      <p class="hint">Les maîtrises de compétences et de sauvegardes se cochent directement sur les caractéristiques.</p>
+      <div class="actions">
+        <button type="button" class="btn" data-action="close">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>`, panel => {
+    const form = panel.querySelector("form");
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      for (const [k] of PROF_FIELDS) c.profs[k] = form.elements[k].value.trim().slice(0, 2000);
+      touch(c); closeSheet(); render(); toast("Maîtrises et langues enregistrées.");
+    });
+  });
+}
+
 /* ================= Export / import ================= */
 const capP = (window.claude && typeof window.claude.use === "function")
   ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
@@ -2625,7 +2670,8 @@ const actions = {
       c.combat.weapons = c.combat.weapons.filter(x => x.id !== w.id); touch(c); closeSheet(); render(); toast("Arme supprimée.");
     });
   },
-  "feat-add": () => sheetFeature(null),
+  "feat-add": t => sheetFeature(null, t.dataset.time),
+  profs: () => sheetProfs(),
   "feat-edit": t => sheetFeature(t.dataset.id),
   "feat-del": t => {
     const c = current(); const f = c.combat.features.find(x => x.id === t.dataset.id); if (!f) return;
