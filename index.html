@@ -254,6 +254,18 @@ textarea.input{ min-height:8rem; font-size:1rem; }
 .turn-bar{ display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:1.4rem; padding:.4rem 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
 .turn-bar .hint{ margin:0; }
 .turn-bar .btn{ flex:none; white-space:nowrap; }
+.turn-btns{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.5rem; }
+@media (max-width:560px){ .turn-bar{ flex-wrap:wrap; } .turn-btns{ width:100%; } .turn-btns .btn{ flex:1; } }
+.atk-count{ display:flex; flex-wrap:wrap; align-items:center; gap:0 .5rem; margin:-.1rem 0 .3rem; }
+.atk-count .hint{ flex:1 1 12rem; margin:0; }
+.atk-pips{ display:flex; flex-wrap:wrap; }
+.wm{ color:var(--brass); }
+.wm.off{ color:var(--ink-soft); text-decoration:line-through; text-decoration-thickness:1px; }
+.spell-meta .warn{ font-style:normal; }
+.std-toggle{ display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; width:100%; min-height:44px; margin:1.25rem 0 .2rem; text-align:left;
+  font-size:1.05rem; font-weight:500; font-style:italic; color:var(--ink-soft); }
+.std-toggle small{ font-style:normal; font-size:.95rem; text-decoration:underline; text-underline-offset:3px; }
+.std-toggle:hover span{ color:var(--ink); }
 .turn-tog{ display:inline-flex; align-items:center; gap:.45rem; min-height:44px; padding:0 .4rem; color:var(--ink-soft); font-size:1rem; }
 .turn-tog[aria-pressed="true"]{ color:var(--brass); }
 .turn-tog .pip{ width:18px; height:18px; }
@@ -453,6 +465,21 @@ const MASTERY = {
   "Renversement": st => `Si tu touches, la créature fait un jet de sauvegarde de Constitution DD ${st.dc}. En cas d'échec, elle est À terre.`,
   "Sape": () => "Si tu touches, la créature a le Désavantage à son prochain jet d'attaque avant le début de ton prochain tour."
 };
+// Actions de base (règles 2024) : [nom, texte d'après la fiche calculée]
+const STD_ACTIONS = [
+  ["Attaquer", (c, d, n) => `Fais une attaque avec une arme ou à mains nues${n > 1 ? `, ${n} avec Attaque supplémentaire. Tu peux te déplacer entre elles` : ""}. Tu peux dégainer ou rengainer une arme à chaque attaque. Une attaque peut être remplacée par une Lutte ou une Bousculade.`],
+  ["Foncer", (c, d) => `Gagne un déplacement supplémentaire égal à ta Vitesse pour ce tour : ${meters(d.out.speed.value)} de plus.`],
+  ["Se désengager", () => "Ton déplacement ne provoque pas d'attaques d'opportunité jusqu'à la fin du tour."],
+  ["Esquiver", () => "Jusqu'au début de ton prochain tour, les attaques contre toi ont le Désavantage si tu vois l'attaquant, et tu as l'Avantage aux sauvegardes de Dextérité. L'effet cesse si tu es Neutralisé ou si ta Vitesse tombe à 0."],
+  ["Aider", () => "Un allié à 1,5 m a l'Avantage à son prochain test de caractéristique, si tu maîtrises la compétence ou l'outil utile. Ou distrais un ennemi à 1,5 m : la prochaine attaque d'un allié contre lui a l'Avantage. Dure jusqu'au début de ton prochain tour."],
+  ["Se cacher", (c, d) => `Hors de vue, derrière un abri important ou total : test de Dextérité (Discrétion) DD 15, ton bonus ${sign(d.out["skill.discretion"].value)}. Réussi, tu es Invisible ; ton résultat devient le DD pour te trouver.`],
+  ["Influencer", (c, d) => `Pousse une créature à faire quelque chose : Charisme (Persuasion ${sign(d.out["skill.persuasion"].value)}, Tromperie ${sign(d.out["skill.tromperie"].value)}, Intimidation ${sign(d.out["skill.intimidation"].value)}, Représentation) ou Sagesse (Dressage). Son attitude décide du DD.`],
+  ["Magie", () => "Lance un sort d'une action, utilise un objet magique ou une capacité magique."],
+  ["Se tenir prêt", () => "Choisis un déclencheur et une action ou un déplacement. Quand il survient, tu agis avec ta Réaction. Un sort préparé ainsi demande ta Concentration jusqu'au déclenchement."],
+  ["Chercher", (c, d) => `Test de Sagesse pour repérer ce qui n'est pas évident : Perception ${sign(d.out["skill.perception"].value)}, Intuition, Médecine ou Survie.`],
+  ["Étudier", (c, d) => `Test d'Intelligence pour te rappeler ou analyser : Investigation ${sign(d.out["skill.investigation"].value)}, Arcanes, Histoire, Nature ou Religion.`],
+  ["Utiliser", () => "Utilise un objet non magique : ouvrir une porte, allumer une torche, actionner un levier…"]
+];
 const DTYPES = ["acide","contondants","feu","force","foudre","froid","nécrotiques","perforants","poison","psychiques","radiants","tonnerre","tranchants"];
 const FEAT_TIMES = [["action","Action"],["bonus","Action bonus"],["reaction","Réaction"],["other","Hors combat (onglet Carac.)"]];
 const RECHARGE = {short:"Repos court", long:"Repos long", none:"Ne se recharge pas"};
@@ -463,7 +490,10 @@ const COIN_PO = {pp:10, po:1, pe:0.5, pa:0.1, pc:0.01};
 // Équipement courant, poids unitaire en kg (règles 2024)
 const GEAR = [["Sac à dos",2.5],["Sac de couchage",3.5],["Couverture",1.5],["Rations (1 jour)",1],["Outre",2.5],["Gamelle",0.5],
   ["Torche",0.5],["Lanterne à capote",1],["Flasque d'huile",0.5],["Boîte à amadou",0.5],["Corde de chanvre (15 m)",2.5],["Grappin",2],
-  ["Pied-de-biche",2.5],["Tente",10],["Trousse de soins",1.5],["Potion de soins",0.25],["Flèches (20)",0.5],["Carreaux (20)",0.75],["Carquois",0.5]];
+  ["Pied-de-biche",2.5],["Tente",10],["Trousse de soins",1.5],["Potion de soins",0.25],["Carquois",0.5],
+  // Munitions et armes de lancer à l'unité : une arme liée en retire une par tir
+  ["Flèches",0.025],["Carreaux",0.038],["Billes de fronde",0.038],["Aiguilles de sarbacane",0.01],["Balles",0.1],
+  ["Javelines",1],["Dagues",0.5],["Fléchettes",0.125],["Hachettes",1]];
 // inc : inclut Neutralisé (rompt la concentration) ; still : vitesse 0
 const CONDITIONS = [
   {k:"a-terre", n:"À terre", t:"Tu te déplaces en rampant, ou te relèves avec la moitié de ta vitesse. Désavantage à tes attaques. Les attaques contre toi ont l'avantage à 1,5 m, le désavantage au-delà."},
@@ -588,9 +618,13 @@ function normCombat(rc){
     acMisc: int(rc.acMisc, -10, 10), tough: !!rc.tough,
     weapons: (Array.isArray(rc.weapons) ? rc.weapons : []).map(normWeapon),
     features: (Array.isArray(rc.features) ? rc.features : []).map(normFeature),
-    turn: {a: !!tu.a, b: !!tu.b, r: !!tu.r}
+    turn: {a: !!tu.a, b: !!tu.b, r: !!tu.r, atk: int(tu.atk, 0, 10)},
+    // Munitions tirées pendant le combat : objet du Sac -> {n, thrown}
+    spent: Object.fromEntries(Object.entries(rc.spent && typeof rc.spent === "object" ? rc.spent : {})
+      .map(([k, v]) => [k, {n: int(v && v.n, 0, 9999), thrown: !!(v && v.thrown)}]).filter(([, v]) => v.n > 0))
   };
 }
+const freshTurn = () => ({a:false, b:false, r:false, atk:0});
 function normWeapon(w){
   w = w || {};
   const str = k => String(w[k] ?? "").trim();
@@ -602,6 +636,7 @@ function normWeapon(w){
     prof: w.prof !== false, magic: int("magic", -5, 5), atkMisc: int("atkMisc", -20, 20), dmgMisc: int("dmgMisc", -20, 20),
     dice: str("dice") || "1d4", dtype: str("dtype"), props: str("props"),
     mastery: MASTERY[w.mastery] ? w.mastery : "", masteryOn: !!w.masteryOn,
+    ammo: str("ammo"),                // objet du Sac consommé à chaque tir ou lancer
     notes: String(w.notes ?? "").trim()
   };
 }
@@ -1714,7 +1749,7 @@ function sheetLongRest(){
     panel.querySelector("#lr").addEventListener("click", () => {
       c.slots.used = {}; c.slots.pact = 0; c.concentration = null;
       c.hitDice = {};
-      cb.dmg = 0; cb.temp = 0; cb.death = {s:0, f:0}; cb.turn = {a:false, b:false, r:false};
+      cb.dmg = 0; cb.temp = 0; cb.death = {s:0, f:0}; cb.turn = freshTurn();
       cb.features.forEach(f => { if (f.recharge !== "none") f.used = 0; });
       c.exhaustion = Math.max(0, c.exhaustion - 1);
       touch(c); closeSheet(); render(); toast("Repos long terminé.");
@@ -1755,6 +1790,23 @@ function weaponStats(c, d, w){
   return {ab, parts, atk: parts.reduce((s, x) => s + x[1], 0), dmg: d.m[ab] + w.magic + w.dmgMisc,
     mod: d.m[ab], dc: 8 + d.m[ab] + pb, versatile: vm ? vm[1].trim() : "",
     range: rm ? rm[1].replace(/\s/g, "") + " m" : "", heavy};
+}
+// Munitions : arme à Munitions (tir) ou de Lancer liée à une pile d'objets du Sac
+function weaponUse(c, w){
+  const p = norm(w.props), ammo = /munition/.test(p), thrown = !ammo && /lancer/.test(p);
+  const it = (w.ammo && c.inventory.find(i => i.id === w.ammo)) || null;
+  const mode = ammo || (it && !thrown) ? "shoot" : thrown && it ? "throw" : "melee";
+  return {ammo, thrown, it, mode};
+}
+const ATK_LBL = {shoot:"Tirer", throw:"Lancer", melee:"Attaquer"};
+function atkBtn(id, mode, label, aria, off){
+  return `<button class="btn cast-btn" data-action="atk" data-id="${id}" data-mode="${mode}" aria-label="${esc(aria)}" ${off ? "disabled" : ""}>${label}</button>`;
+}
+function guessAmmo(c, props, name){
+  const m = props.match(/munitions[^;)]*;\s*([^)]+)\)/i);
+  const key = norm(m ? m[1] : /lancer/i.test(props) ? name : "").replace(/s$/, "").slice(0, 6);
+  const it = key && c.inventory.find(i => norm(i.name).includes(key));
+  return it ? it.id : "";
 }
 
 function renderCombat(c, d){
@@ -1810,7 +1862,8 @@ function renderCombat(c, d){
     <span class="pip ${cb.turn[k] ? "on" : ""}" aria-hidden="true"></span>${cb.turn[k] ? "Utilisée" : "Disponible"}</button>`;
   const anyTurn = cb.turn.a || cb.turn.b || cb.turn.r;
   const turnBar = `<div class="turn-bar"><span class="hint">Coche ce que tu as dépensé pendant ton tour.</span>
-    <button class="btn" data-action="turn-new" ${anyTurn ? "" : "disabled"}>Nouveau tour</button></div>`;
+    <span class="turn-btns"><button class="btn" data-action="turn-new" ${anyTurn ? "" : "disabled"}>Nouveau tour</button>
+    <button class="btn" data-action="combat-end">Fin du combat</button></span></div>`;
 
   const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "fr");
   const sp = t => c.spells.filter(s => s.time === t && (s.level === 0 || s.prepared || s.always))
@@ -1819,13 +1872,22 @@ function renderCombat(c, d){
   const list = items => items.length ? `<ul class="spells cb-list">${items.join("")}</ul>` : "";
   const grp = (title, items) => items.length ? `<h3 class="lvl-head">${title}</h3>${list(items)}` : "";
 
-  const napa = attacksPerAction(c);
-  const attacks = [...cb.weapons.map(w => weaponItem(c, d, w)), unarmedItem(c, d)];
+  const napa = attacksPerAction(c), done = Math.min(cb.turn.atk, napa);
+  const attacks = [...cb.weapons.map(w => weaponItem(c, d, w)), unarmedItem(c, d), maneuverItem(c, d, "grapple"), maneuverItem(c, d, "shove")];
+  let apips = "";
+  for (let i = 0; i < napa; i++) apips += `<button class="slot-pip${i < done ? " spent" : ""}" data-action="atk-pip" data-i="${i}" aria-label="Attaque ${i + 1} sur ${napa} : ${i < done ? "faite. L'annuler." : "disponible. La marquer."}"><i></i></button>`;
+  const atkCount = `<div class="atk-count"><span class="hint">${napa > 1 ? `Attaque supplémentaire : ${napa} attaques par action Attaque` : "Une attaque par action Attaque"}</span>
+    <span class="atk-pips">${apips}</span><span class="slot-count">${napa - done} sur ${napa}</span></div>`;
+  const stdOpen = view.openCombat.has("std");
+  const std = `<button class="std-toggle" data-action="cb-toggle" data-key="std" aria-expanded="${stdOpen}">
+      <span>Actions de base</span><small>${stdOpen ? "Masquer" : "Afficher les " + STD_ACTIONS.length}</small></button>
+    ${stdOpen ? list(STD_ACTIONS.map(([n, f]) => `<li class="spell"><div class="spell-row"><div class="spell-open"><span class="spell-main">
+      <span class="spell-name">${n}</span><span class="spell-meta">${esc(f(c, d, napa))}</span></span></div></div></li>`)) : ""}`;
   const action = `
     <div class="sec-head"><h2>Action</h2>${tog("a", "Action")}</div>
-    ${grp("Attaques" + (napa > 1 ? `<small>${napa} par action Attaque</small>` : ""), attacks)}
+    <h3 class="lvl-head">Attaques</h3>${atkCount}${list(attacks)}
     <button class="btn btn-quiet add-line" data-action="wpn-add">+ Ajouter une arme</button>
-    ${grp("Sorts", sp("action"))}${grp("Capacités", ft("action"))}`;
+    ${grp("Sorts", sp("action"))}${grp("Capacités", ft("action"))}${std}`;
   const bs = sp("bonus"), bf = ft("bonus");
   const bonus = `
     <div class="sec-head"><h2>Action bonus</h2>${tog("b", "Action bonus")}</div>
@@ -1849,32 +1911,40 @@ function renderCombat(c, d){
 }
 
 function weaponItem(c, d, w){
-  const st = weaponStats(c, d, w), key = "w:" + w.id, open = view.openCombat.has(key);
+  const st = weaponStats(c, d, w), u = weaponUse(c, w), key = "w:" + w.id, open = view.openCombat.has(key);
   const name = esc(w.name) || "Arme sans nom";
   const dmg = dmgTxt(w.dice, st.dmg, w.dtype);
-  const meta = [dmg, st.range, w.masteryOn ? w.mastery : ""].filter(Boolean).join(", ");
+  const meta = [dmg, st.range].filter(Boolean).join(", ");
+  const empty = u.it && !u.it.qty;
+  const stock = u.it ? u.it.name + (u.it.qty ? " : " + u.it.qty : " : stock épuisé") : "";
+  const sub = [w.mastery ? `<span class="wm${w.masteryOn ? "" : " off"}">Botte : ${esc(w.mastery)}</span>` : "",
+    stock ? `<span class="${empty ? "warn" : ""}">${esc(stock)}</span>` : ""].filter(Boolean).join(" · ");
+  const subTxt = [w.mastery ? "botte " + w.mastery : "", stock].filter(Boolean).join(", ");
   let body = "";
   if (open){
     const facts = [
       ["Attaque", st.parts.map(([l, v]) => l + " " + sign(v)).join(", ")],
       ["Dégâts", dmg + (st.versatile ? ", ou " + dmgTxt(st.versatile, st.dmg, w.dtype) + " à deux mains" : "")],
       ["Propriétés", w.props],
-      ["Botte", w.mastery ? w.mastery + (w.masteryOn ? "" : " (tu ne peux pas l'utiliser)") : ""]
+      ["Botte", w.mastery ? w.mastery + (w.masteryOn ? "" : " (tu ne peux pas l'utiliser)") : ""],
+      [u.thrown ? "Réserve" : "Munitions", u.it ? `${u.it.name}, ${u.it.qty} dans le Sac` : u.ammo || u.thrown ? "Aucune liée : modifie l'arme pour choisir un objet du Sac" : ""]
     ].filter(x => x[1]).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
-    const mt = w.masteryOn && MASTERY[w.mastery] ? `<p><span class="up">${esc(w.mastery)}.</span> ${esc(MASTERY[w.mastery](st))}</p>` : "";
+    const mt = MASTERY[w.mastery] ? `<p><span class="up">${esc(w.mastery)}.</span> ${esc(MASTERY[w.mastery](st))}</p>` : "";
+    const alt = u.thrown && u.it && w.kind === "melee" ? atkBtn(w.id, "melee", "Attaquer au corps à corps", "Attaquer au corps à corps avec " + w.name) : "";
     body = `<div class="spell-body">
       <dl class="spell-facts">${facts}</dl>
-      <div class="spell-desc">${mt}${st.heavy ? `<p class="warn">${esc(st.heavy)}</p>` : ""}${paras(w.notes)}</div>
-      <div class="spell-actions">
+      <div class="spell-desc">${mt}${empty ? `<p class="warn">Plus de ${esc(u.it.name)} : la Fin du combat en récupère, ou ajoute-en dans le Sac.</p>` : ""}${st.heavy ? `<p class="warn">${esc(st.heavy)}</p>` : ""}${paras(w.notes)}</div>
+      <div class="spell-actions">${alt}
         <button class="btn" data-action="wpn-edit" data-id="${w.id}">Modifier</button>
         <button class="btn btn-quiet" data-action="wpn-del" data-id="${w.id}">Supprimer</button>
       </div></div>`;
   }
+  const consumes = u.mode !== "melee" && u.it;
   return `<li class="spell"><div class="spell-row">
-    <button class="spell-open" data-action="cb-toggle" data-key="${key}" aria-expanded="${open}" aria-label="${name}, attaque ${sign(st.atk)}, ${esc(meta)}">
+    <button class="spell-open" data-action="cb-toggle" data-key="${key}" aria-expanded="${open}" aria-label="${name}, attaque ${sign(st.atk)}, ${esc([meta, subTxt].filter(Boolean).join(", "))}">
       <span class="atk-bonus" aria-hidden="true">${sign(st.atk)}<small>attaque</small></span>
-      <span class="spell-main" aria-hidden="true"><span class="spell-name">${name}</span><span class="spell-meta">${esc(meta)}</span></span>
-    </button></div>${body}</li>`;
+      <span class="spell-main" aria-hidden="true"><span class="spell-name">${name}</span><span class="spell-meta">${esc(meta)}</span>${sub ? `<span class="spell-meta">${sub}</span>` : ""}</span>
+    </button>${atkBtn(w.id, u.mode, ATK_LBL[u.mode], ATK_LBL[u.mode] + " avec " + (w.name || "l'arme") + (consumes ? ", retire 1 " + u.it.name : ""), consumes && empty)}</div>${body}</li>`;
 }
 
 function unarmedItem(c, d){
@@ -1893,7 +1963,26 @@ function unarmedItem(c, d){
   return `<li class="spell"><div class="spell-row"><div class="spell-open" aria-label="Mains nues, attaque ${sign(atk)}, ${esc(dmg)}">
     <span class="atk-bonus" aria-hidden="true">${sign(atk)}<small>attaque</small></span>
     <span class="spell-main" aria-hidden="true"><span class="spell-name">Mains nues</span><span class="spell-meta">${esc(dmg)}</span></span>
-  </div></div></li>`;
+  </div>${atkBtn("unarmed", "melee", "Attaquer", "Attaquer à mains nues")}</div></li>`;
+}
+
+// Lutte et Bousculade : une attaque à mains nues qui impose une sauvegarde (DD 8 + For + maîtrise)
+function maneuverItem(c, d, k){
+  const dc = 8 + d.m.for + d.out.pb.value, key = "m:" + k, open = view.openCombat.has(key);
+  const M = k === "grapple"
+    ? {n:"Lutte", meta:"Échec : la cible est Agrippée", desc:[
+        `La cible, à ta portée et d'au plus une taille de plus que toi, fait une sauvegarde de Force ou de Dextérité (à son choix) DD ${dc}. Échec : elle a l'état Agrippé. Il te faut une main libre.`,
+        "Tu peux te déplacer en la traînant, mais chaque mètre te coûte un mètre de plus, sauf si elle est de taille TP ou au moins deux tailles plus petite que toi.",
+        `Pour s'échapper, elle utilise une action : test de Force (Athlétisme) ou de Dextérité (Acrobaties) contre DD ${dc}. Tu peux la lâcher quand tu veux.`]}
+    : {n:"Bousculade", meta:"Échec : repoussée de 1,5 m ou À terre", desc:[
+        `La cible, à ta portée et d'au plus une taille de plus que toi, fait une sauvegarde de Force ou de Dextérité (à son choix) DD ${dc}. Échec : tu la repousses de 1,5 m ou elle tombe À terre, à ton choix.`]};
+  const body = open ? `<div class="spell-body"><div class="spell-desc">${M.desc.map(p => `<p>${esc(p)}</p>`).join("")}
+    <p class="hint">DD : 8 + mod. Force ${sign(d.m.for)} + maîtrise ${sign(d.out.pb.value)}. Remplace une attaque de l'action Attaque ou une attaque d'opportunité.</p></div></div>` : "";
+  return `<li class="spell"><div class="spell-row">
+    <button class="spell-open" data-action="cb-toggle" data-key="${key}" aria-expanded="${open}" aria-label="${M.n}, sauvegarde DD ${dc}. ${M.meta}">
+      <span class="atk-bonus" aria-hidden="true">${dc}<small>DD</small></span>
+      <span class="spell-main" aria-hidden="true"><span class="spell-name">${M.n}</span><span class="spell-meta">${M.meta}</span></span>
+    </button>${atkBtn(k, "melee", "Tenter", M.n + " : tenter")}</div>${body}</li>`;
 }
 
 function combatSpellItem(c, s){
@@ -2078,7 +2167,10 @@ function sheetWeapon(id){
           ${Object.keys(MASTERY).map(m => `<option ${w.mastery === m ? "selected" : ""}>${m}</option>`).join("")}</select></label>
         <label class="check" style="align-self:end"><input type="checkbox" name="masteryOn" ${w.masteryOn ? "checked" : ""}> Je peux l'utiliser</label>
       </div>
-      <label class="field"><span>Notes</span><textarea class="input" name="notes" placeholder="+1d6 feu, charges, munitions restantes…">${esc(w.notes)}</textarea></label>
+      <label class="field"><span>Munitions ou armes à lancer (Sac)</span><select class="input" name="ammo"><option value="">Aucune</option>
+        ${c.inventory.map(i => `<option value="${i.id}" ${w.ammo === i.id ? "selected" : ""}>${esc(i.name) || "Objet sans nom"} (${i.qty})</option>`).join("")}</select>
+        <small class="hint">${c.inventory.length ? "Flèches, carreaux, billes… ou ta pile de javelines, de dagues. Chaque tir ou lancer en retire une ; la quantité compte les pièces, pas les lots." : "Ajoute d'abord tes flèches, carreaux ou javelines dans l'onglet Sac."}</small></label>
+      <label class="field"><span>Notes</span><textarea class="input" name="notes" placeholder="+1d6 feu, charges…">${esc(w.notes)}</textarea></label>
       <div class="actions">
         <button type="button" class="btn" data-action="close">Annuler</button>
         <button type="submit" class="btn btn-primary">${ex ? "Enregistrer" : "Ajouter l'arme"}</button>
@@ -2092,6 +2184,7 @@ function sheetWeapon(id){
       if (!nm || WEAPON_BY[nm]) el.name.value = W.n;
       el.dice.value = W.d; el.dtype.value = W.t; el.props.value = W.p; el.mastery.value = W.b;
       el.kind.value = W.k === "r" ? "ranged" : "melee";
+      if (!el.ammo.value) el.ammo.value = guessAmmo(c, W.p, W.n);
     });
     form.addEventListener("submit", e => {
       e.preventDefault();
@@ -2099,7 +2192,7 @@ function sheetWeapon(id){
         id: w.id, name: el.name.value, base: el.base.value, kind: el.kind.value, ability: el.ability.value,
         prof: el.prof.checked, magic: el.magic.value, atkMisc: el.atkMisc.value, dmgMisc: el.dmgMisc.value,
         dice: el.dice.value, dtype: el.dtype.value, props: el.props.value,
-        mastery: el.mastery.value, masteryOn: el.masteryOn.checked, notes: el.notes.value
+        mastery: el.mastery.value, masteryOn: el.masteryOn.checked, ammo: el.ammo.value, notes: el.notes.value
       });
       if (!nw.name){ toast("Donne un nom à l'arme."); return; }
       const list = c.combat.weapons, i = list.findIndex(x => x.id === nw.id);
@@ -2143,6 +2236,51 @@ function sheetFeature(id, time){
       if (i >= 0) list[i] = nf; else list.push(nf);
       touch(c); closeSheet(); render();
       toast(i >= 0 ? "Capacité modifiée." : nf.name + " ajoutée.");
+    });
+  });
+}
+
+/* --- Attaques et munitions --- */
+function attack(c, id, mode){
+  const cb = c.combat, napa = attacksPerAction(c), msgs = [];
+  const w = cb.weapons.find(x => x.id === id);
+  const it = w && mode !== "melee" ? weaponUse(c, w).it : null;
+  if (it && !it.qty) return `Plus de ${it.name} : la Fin du combat en récupère.`;
+  if (cb.turn.atk < napa){
+    cb.turn.atk++; cb.turn.a = true;
+    msgs.push(napa > 1 ? `Attaque ${cb.turn.atk} sur ${napa}.` : "Action Attaque utilisée.");
+  } else msgs.push("Attaques de l'action déjà faites : celle-ci passe par une action bonus ou une capacité.");
+  if (it){
+    it.qty--;
+    const sp = cb.spent[it.id] || (cb.spent[it.id] = {n:0, thrown:false});
+    sp.n++; sp.thrown = mode === "throw";
+    msgs.push(it.qty ? `${it.name} : il en reste ${it.qty}.` : `Attention : plus de ${it.name} ! Récupères-en avec la Fin du combat.`);
+  }
+  return msgs.join(" ");
+}
+function sheetEndCombat(){
+  const c = current(); if (!c) return;
+  const cb = c.combat;
+  const rows = Object.entries(cb.spent).map(([id, sp]) => {
+    const it = c.inventory.find(i => i.id === id);
+    return it && {it, n: sp.n, thrown: sp.thrown, back: sp.thrown ? sp.n : Math.floor(sp.n / 2)};
+  }).filter(Boolean);
+  openSheet(`
+    <h2>Fin du combat</h2>
+    ${rows.length ? `<ul class="breakdown">${rows.map(r => `<li><span>${esc(r.it.name)} : ${r.n} ${r.thrown ? "lancer" : "tir"}${r.n > 1 ? "s" : ""}</span><b>+${r.back}</b></li>`).join("")}</ul>
+      <p class="hint">Règle 2024 : en fouillant le champ de bataille pendant une minute, tu récupères la moitié des munitions tirées, arrondie à l'inférieur. Les armes lancées se ramassent toutes.</p>`
+      : `<p class="hint">Aucune munition tirée ni arme lancée pendant ce combat.</p>`}
+    <p class="hint">Ton action, ton action bonus, ta réaction et tes attaques redeviennent disponibles.</p>
+    <div class="actions">
+      <button class="btn" data-action="close">Annuler</button>
+      <button class="btn btn-primary" id="ec-go">${rows.some(r => r.back) ? "Récupérer et terminer" : "Terminer le combat"}</button>
+    </div>`, panel => {
+    panel.querySelector("#ec-go").addEventListener("click", () => {
+      rows.forEach(r => { r.it.qty = clamp(r.it.qty + r.back, 0, 99999); });
+      const got = rows.filter(r => r.back).map(r => `${r.back} ${r.it.name}`);
+      cb.spent = {}; cb.turn = freshTurn();
+      touch(c); closeSheet(); render();
+      toast(got.length ? "Combat terminé. Récupéré : " + frList(got) + "." : "Combat terminé.");
     });
   });
 }
@@ -2322,7 +2460,7 @@ function renderBag(c){
   const pct = w.cap ? Math.min(100, Math.round(w.total / w.cap * 100)) : 100;
   const over = w.total > w.cap;
   const att = w.att ? `<p class="${w.att > 3 ? "warn" : "hint"}">Harmonisation : ${w.att} objet${w.att > 1 ? "s" : ""} sur 3${w.att > 3 ? ", c'est plus que le maximum" : ""}.</p>` : "";
-  const items = c.inventory.map(itemRow).join("");
+  const items = c.inventory.map(it => itemRow(c, it)).join("");
   return `
     <div class="sec-head"><h2>Bourse</h2>${wealth ? `<span class="wealth">${wealth.toLocaleString("fr-FR", {maximumFractionDigits:2})} po en tout</span>` : ""}</div>
     ${coins}
@@ -2337,10 +2475,11 @@ function renderBag(c){
       <p class="hint">Capacité : Force ${c.abilities.for} × 7,5 kg${w.gol ? ", doublée par la Carrure puissante du goliath" : ""}. Les pièces comptent, 500 g les 50.</p>
     </div>`;
 }
-function itemRow(it){
+function itemRow(c, it){
   const open = view.openItems.has(it.id);
   const name = esc(it.name) || "Objet sans nom";
-  const meta = [it.weight ? (it.qty > 1 ? kg(it.weight) + " l'unité, " + kg(it.weight * it.qty) + " en tout" : kg(it.weight)) : "",
+  const users = c.combat.weapons.filter(w => w.ammo === it.id).map(w => w.name);
+  const meta = [users.length ? "pour " + frList(users) : "", it.weight ? (it.qty > 1 ? kg(it.weight) + " l'unité, " + kg(it.weight * it.qty) + " en tout" : kg(it.weight)) : "",
     it.attuned ? "harmonisé" : "", it.qty ? "" : "épuisé"].filter(Boolean).join(", ");
   const body = open ? `<div class="spell-body">
       ${it.notes ? `<div class="spell-desc">${paras(it.notes)}</div>` : ""}
@@ -2633,7 +2772,9 @@ const actions = {
   "item-del": t => {
     const c = current(); const it = c.inventory.find(x => x.id === t.dataset.id); if (!it) return;
     sheetConfirm(`Supprimer « ${esc(it.name) || "Objet sans nom"} » ?`, "L'objet sera retiré du sac.", "Garder l'objet", "Supprimer", () => {
-      c.inventory = c.inventory.filter(x => x.id !== it.id); touch(c); closeSheet(); render(); toast("Objet supprimé.");
+      c.inventory = c.inventory.filter(x => x.id !== it.id); delete c.combat.spent[it.id];
+      c.combat.weapons.forEach(w => { if (w.ammo === it.id) w.ammo = ""; });
+      touch(c); closeSheet(); render(); toast("Objet supprimé.");
     });
   },
   install: () => sheetInstall(),
@@ -2654,9 +2795,21 @@ const actions = {
     c.combat.dmg = Math.max(0, max - 1); c.combat.death = {s:0, f:0};
     touch(c); render(); toast("20 naturel : tu reprends conscience avec 1 PV.");
   },
-  turn: t => { const c = current(); c.combat.turn[t.dataset.k] = !c.combat.turn[t.dataset.k]; touch(c); render(); },
-  "turn-new": () => { const c = current(); c.combat.turn = {a:false, b:false, r:false}; touch(c); render(); toast("Nouveau tour : action, action bonus et réaction disponibles."); },
+  turn: t => {
+    const c = current(), tu = c.combat.turn; tu[t.dataset.k] = !tu[t.dataset.k];
+    if (!tu.a) tu.atk = 0;
+    touch(c); render();
+  },
+  "turn-new": () => { const c = current(); c.combat.turn = freshTurn(); touch(c); render(); toast("Nouveau tour : action, action bonus et réaction disponibles."); },
   armor: () => sheetArmor(),
+  atk: t => { const c = current(); const msg = attack(c, t.dataset.id, t.dataset.mode); touch(c); render(); toast(msg); },
+  "atk-pip": t => {
+    const c = current(), tu = c.combat.turn, i = +t.dataset.i, napa = attacksPerAction(c);
+    tu.atk = Math.min(tu.atk, napa) > i ? i : i + 1;
+    if (tu.atk) tu.a = true;
+    touch(c); render();
+  },
+  "combat-end": () => sheetEndCombat(),
   "cb-toggle": t => {
     ensureCombatView(); const k = t.dataset.key;
     if (view.openCombat.has(k)) view.openCombat.delete(k); else view.openCombat.add(k);
