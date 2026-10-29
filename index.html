@@ -484,6 +484,135 @@ const DTYPES = ["acide","contondants","feu","force","foudre","froid","nécrotiqu
 const FEAT_TIMES = [["action","Action"],["bonus","Action bonus"],["reaction","Réaction"],["other","Hors combat (onglet Carac.)"]];
 const RECHARGE = {short:"Repos court", long:"Repos long", none:"Ne se recharge pas"};
 
+/* --- Sous-classes (règles 2024) --- */
+// Par classe : re reconnaît le texte saisi ; sp : sorts toujours préparés par niveau de classe [nom, niveau, marques]
+// (c concentration, b action bonus, r réaction) ; f : capacités [niveau, nom, moment, texte(lv, m), utilisations(lv, m), recharge(lv)]
+const SUB_CD = "Utilise une charge de Conduit divin.";
+const SUBCLASSES = {
+  clerc: [
+    {k:"vie", n:"Domaine de la Vie", re:/vie|life/,
+      sp:{3:[["Aide",2],["Bénédiction",1,"c"],["Soins",1],["Restauration partielle",2,"b"]], 5:[["Mot de guérison de groupe",3,"b"],["Retour à la vie",3]],
+        7:[["Aura de vie",4,"c"],["Protection contre la mort",4]], 9:[["Restauration supérieure",5],["Soins de groupe",5]]},
+      f:[[3, "Disciple de la vie", "other", () => "Quand un sort lancé avec un emplacement rend des points de vie, la cible récupère en plus 2 + le niveau de l'emplacement, au moment où le sort la soigne."],
+        [3, "Préservation de la vie", "action", lv => `${SUB_CD} Rends jusqu'à ${5 * lv} PV (5 × ton niveau de clerc), répartis entre des créatures En sang à 9 m ou moins. Une créature ne peut pas dépasser la moitié de ses PV maximum ainsi.`],
+        [6, "Guérisseur béni", "other", () => "Quand tu lances un sort avec un emplacement qui rend des PV à une autre créature, tu récupères 2 + le niveau de l'emplacement."],
+        [17, "Guérison suprême", "other", () => "Quand tu lances des dés pour rendre des PV avec un sort ou un Conduit divin, chaque dé donne son maximum."]]},
+    {k:"lumiere", n:"Domaine de la Lumière", re:/lumiere|light/,
+      sp:{3:[["Mains brûlantes",1],["Lueurs féeriques",1,"c"],["Rayon ardent",2],["Voir l'invisible",2]], 5:[["Lumière du jour",3],["Boule de feu",3]],
+        7:[["Œil magique",4,"c"],["Mur de feu",4,"c"]], 9:[["Colonne de flamme",5],["Scrutation",5,"c"]]},
+      f:[[3, "Radiance de l'aube", "action", lv => `${SUB_CD} Dissipe les ténèbres magiques à 9 m. Chaque créature de ton choix à 9 m fait une sauvegarde de Constitution contre ton DD de sorts : 2d10 + ${lv} dégâts radiants, la moitié si elle réussit.`],
+        [3, "Lueur protectrice", "reaction", (lv, m) => `Quand une créature que tu vois à 9 m ${lv >= 6 ? "attaque toi ou une autre créature" : "t'attaque"}, impose-lui le Désavantage à ce jet d'attaque.` + (lv >= 6 ? ` La cible de l'attaque gagne 2d6 ${sign(m.sag)} PV temporaires.` : ""), (lv, m) => Math.max(1, m.sag), lv => lv >= 6 ? "short" : "long"],
+        [17, "Halo de lumière", "action", () => "Pendant 1 minute, tu émets une lumière vive sur 18 m et faible sur 9 m de plus. Tes ennemis dans la lumière vive ont le Désavantage aux sauvegardes contre ta Radiance de l'aube et tes sorts de feu ou radiants.", (lv, m) => Math.max(1, m.sag)]]},
+    {k:"duperie", n:"Domaine de la Duperie", re:/duperie|ruse|tromp|trick/,
+      sp:{3:[["Charme-personne",1],["Déguisement",1],["Invisibilité",2,"c"],["Passage sans trace",2,"c"]], 5:[["Motif hypnotique",3,"c"],["Antidétection",3]],
+        7:[["Confusion",4,"c"],["Porte dimensionnelle",4]], 9:[["Domination de personne",5,"c"],["Modification de mémoire",5,"c"]]},
+      f:[[3, "Bénédiction de l'escroc", "action", () => "Toi ou une créature consentante à 9 m avez l'Avantage aux tests de Dextérité (Discrétion) jusqu'à ton prochain repos long ou jusqu'à ce que tu la donnes à nouveau."],
+        [3, "Invocation de duplicité", "bonus", lv => `${SUB_CD} Crée une illusion parfaite de toi à 9 m pendant 1 minute. Tu peux lancer tes sorts depuis son emplacement. Tu as l'Avantage pour attaquer une créature située à 1,5 m de toi et de l'illusion. Action bonus : déplace-la de 9 m.` + (lv >= 17 ? " Tes alliés ont aussi l'Avantage contre une créature à 1,5 m de l'illusion ; quand elle prend fin, toi ou une créature à 1,5 m d'elle récupérez " + lv + " PV." : "")],
+        [6, "Transposition de l'escroc", "other", () => "Quand tu crées ou déplaces ton illusion, tu peux échanger ta place avec elle par téléportation."]]},
+    {k:"guerre", n:"Domaine de la Guerre", re:/guerre|war/,
+      sp:{3:[["Éclair traçant",1],["Arme magique",2,"b"],["Bouclier de la foi",1,"bc"],["Arme spirituelle",2,"bc"]], 5:[["Aura du croisé",3,"c"],["Esprits gardiens",3,"c"]],
+        7:[["Bouclier de feu",4],["Liberté de mouvement",4]], 9:[["Immobilisation de monstre",5,"c"],["Frappe du vent d'acier",5]]},
+      f:[[3, "Prêtre de guerre", "bonus", () => "Fais une attaque avec une arme ou à mains nues.", (lv, m) => Math.max(1, m.sag), () => "short"],
+        [3, "Frappe guidée", "reaction", () => `${SUB_CD} Quand toi ou une créature à 9 m ratez un jet d'attaque, ajoute +10 au jet. Pour une autre créature, cela prend ta Réaction.`],
+        [6, "Bénédiction du dieu de la guerre", "bonus", () => `${SUB_CD} Lance Bouclier de la foi ou Arme spirituelle sans emplacement ni Concentration : le sort dure 1 minute.`],
+        [17, "Avatar de bataille", "other", () => "Résistance aux dégâts contondants, perforants et tranchants."]]}
+  ],
+  barde: [
+    {k:"savoir", n:"Collège du Savoir", re:/savoir|lore/,
+      f:[[3, "Maîtrises supplémentaires", "other", () => "Tu gagnes la maîtrise de trois compétences de ton choix. Coche-les dans l'onglet Caractéristiques."],
+        [3, "Mots cinglants", "reaction", () => "Quand une créature que tu vois à 18 m réussit un test ou un jet d'attaque, ou fait un jet de dégâts, dépense une Inspiration bardique : lance le dé et retire le résultat de son jet."],
+        [6, "Découvertes magiques", "other", () => "Apprends deux sorts de ton choix des listes du clerc, du druide ou du magicien. Ils sont toujours préparés et comptent comme des sorts de barde. Ajoute-les dans l'onglet Sorts."],
+        [14, "Talent sans égal", "other", () => "Quand tu rates un test de caractéristique ou un jet d'attaque, dépense une Inspiration bardique et ajoute le dé au jet. Si tu échoues quand même, l'Inspiration n'est pas dépensée."]]},
+    {k:"danse", n:"Collège de la Danse", re:/danse|dance/,
+      f:[[3, "Jeu de jambes éblouissant", "other", (lv, m) => `Sans armure ni bouclier : Avantage aux tests de Représentation où tu danses ; CA de 10 + Dex + Cha (${10 + m.dex + m.cha}), appliquée automatiquement ; quand tu dépenses une Inspiration bardique dans une action, une action bonus ou une réaction, tu peux faire une attaque à mains nues dans le cadre de celle-ci. Tes attaques à mains nues utilisent la Dextérité et infligent le dé d'Inspiration bardique ${sign(m.dex)} dégâts contondants, sans le dépenser.`],
+        [6, "Coordination de groupe", "other", () => "Quand tu lances l'initiative, dépense une Inspiration bardique : lance le dé, toi et tes alliés à 9 m ajoutez le résultat à votre initiative."],
+        [6, "Mouvement inspirant", "reaction", () => "Quand un ennemi que tu vois termine son tour à 1,5 m de toi, dépense une Inspiration bardique : déplace-toi de la moitié de ta Vitesse sans provoquer d'attaque d'opportunité. Un allié à 9 m peut utiliser sa Réaction pour faire de même."],
+        [14, "Esquive menée", "other", () => "Quand une sauvegarde de Dextérité réussie te ferait subir la moitié des dégâts, tu n'en subis aucun, et seulement la moitié en cas d'échec. Les créatures à 1,5 m de toi en profitent aussi. Pas si tu es Neutralisé."]]},
+    {k:"glamour", n:"Collège du Glamour", re:/glamour|seduc|eclat/,
+      sp:{3:[["Charme-personne",1],["Image miroir",2]]},
+      f:[[3, "Magie ensorcelante", "other", () => "Après avoir lancé un sort d'enchantement ou d'illusion avec un emplacement, une créature que tu vois à 18 m fait une sauvegarde de Sagesse contre ton DD de sorts. Échec : elle est Charmée ou Effrayée (au choix) pendant 1 minute, et refait la sauvegarde à la fin de chacun de ses tours. Une fois par repos long, ou en dépensant une Inspiration bardique.", () => 1],
+        [3, "Manteau d'inspiration", "bonus", (lv, m) => `Dépense une Inspiration bardique et lance le dé. Jusqu'à ${Math.max(1, m.cha)} créatures à 18 m gagnent chacune deux fois le résultat en PV temporaires, et peuvent utiliser leur Réaction pour se déplacer de leur Vitesse sans provoquer d'attaque d'opportunité.`],
+        [6, "Manteau de majesté", "bonus", () => "Lance Injonction sans emplacement, puis pendant 1 minute (Concentration), relance-le à chaque tour en action bonus sans emplacement. Une créature que tu as Charmée échoue automatiquement à la sauvegarde. Une fois par repos long, ou avec un emplacement de niveau 3 ou plus.", () => 1],
+        [14, "Majesté inébranlable", "bonus", () => "Pendant 1 minute, la première fois à chaque tour qu'une créature t'attaque, elle fait une sauvegarde de Charisme contre ton DD de sorts. Échec : l'attaque te rate.", () => 1, () => "short"]]},
+    {k:"vaillance", n:"Collège de la Vaillance", re:/vaillance|valeur|valor/,
+      f:[[3, "Formation martiale", "other", () => "Maîtrise des armes de guerre, des armures intermédiaires et des boucliers. Tu peux utiliser une arme courante ou de guerre comme focaliseur. Ajoute ces maîtrises dans l'onglet Caractéristiques."],
+        [3, "Inspiration martiale", "other", () => "Une créature qui a ton Inspiration bardique peut s'en servir pour se défendre (quand elle est touchée, sa Réaction ajoute le dé à sa CA contre cette attaque) ou pour frapper (juste après avoir touché, elle ajoute le dé aux dégâts)."],
+        [6, "Attaque supplémentaire", "other", () => "Deux attaques par action Attaque, comptées dans l'onglet Combat. Tu peux remplacer l'une d'elles par un tour de magie dont le temps d'incantation est une action."],
+        [14, "Magie de bataille", "bonus", () => "Après avoir lancé un sort dont le temps d'incantation est une action, fais une attaque avec une arme en action bonus."]]}
+  ],
+  magicien: [
+    {k:"abjurateur", n:"Abjurateur", re:/abjur/,
+      sp:{10:[["Contresort",3,"r"],["Dissipation de la magie",3]]},
+      f:[[3, "Savant en abjuration", "other", () => "Ajoute gratuitement deux sorts d'abjuration de niveau 2 ou moins à ton grimoire, puis un de plus à chaque nouveau niveau d'emplacements."],
+        [3, "Protection arcanique", "other", (lv, m) => `Quand tu lances un sort d'abjuration avec un emplacement, tu peux créer une protection de ${Math.max(1, 2 * lv + m.int)} PV (2 × niveau de magicien + Int) qui encaisse tes dégâts à ta place. Elle dure jusqu'à ton repos long. Chaque sort d'abjuration lancé avec un emplacement lui rend 2 PV par niveau d'emplacement ; en action bonus, dépense un emplacement pour lui rendre autant.`, () => 1],
+        [6, "Protection projetée", "reaction", () => "Quand une créature que tu vois à 9 m subit des dégâts, ta Protection arcanique les encaisse à sa place."],
+        [10, "Briseur de sorts", "other", () => "Contresort et Dissipation de la magie sont toujours préparés. Tu lances Dissipation de la magie en action bonus et ajoutes ton bonus de maîtrise au test. Si l'un de ces sorts échoue, l'emplacement n'est pas dépensé."],
+        [14, "Résistance aux sorts", "other", () => "Avantage aux sauvegardes contre les sorts, et résistance aux dégâts des sorts."]]},
+    {k:"devin", n:"Devin", re:/devin|divin/,
+      f:[[3, "Savant en divination", "other", () => "Ajoute gratuitement deux sorts de divination de niveau 2 ou moins à ton grimoire, puis un de plus à chaque nouveau niveau d'emplacements."],
+        [3, "Présage", "other", lv => `Après un repos long, lance ${lv >= 14 ? "trois" : "deux"} d20 et note les résultats. Tu peux remplacer un test d20 fait par toi ou une créature que tu vois par l'un d'eux, une fois par tour. Chaque résultat ne sert qu'une fois.`, lv => lv >= 14 ? 3 : 2],
+        [6, "Expert en divination", "other", () => "Quand tu lances un sort de divination de niveau 2 ou plus avec un emplacement, tu récupères un emplacement de niveau inférieur à celui-ci, de niveau 5 au plus."],
+        [10, "Le troisième œil", "bonus", () => "Choisis jusqu'à ton prochain repos : vision dans le noir sur 36 m, lire toutes les langues, ou lancer Voir l'invisible sans emplacement.", () => 1, () => "short"]]},
+    {k:"evocateur", n:"Évocateur", re:/evoc/,
+      f:[[3, "Savant en évocation", "other", () => "Ajoute gratuitement deux sorts d'évocation de niveau 2 ou moins à ton grimoire, puis un de plus à chaque nouveau niveau d'emplacements."],
+        [3, "Tour de magie puissant", "other", () => "Quand ton tour de magie rate une créature ou qu'elle réussit sa sauvegarde, elle subit quand même la moitié des dégâts, sans les autres effets."],
+        [6, "Sculpter les sorts", "other", () => "Quand tu lances un sort d'évocation, choisis 1 + le niveau du sort créatures que tu vois : elles réussissent leur sauvegarde et ne subissent aucun dégât si elles devaient en subir la moitié."],
+        [10, "Évocation renforcée", "other", (lv, m) => `Ajoute ${sign(m.int)} (ton modificateur d'Intelligence) à un jet de dégâts de tes sorts d'évocation de magicien.`],
+        [14, "Surcharge", "other", () => "Quand tu lances un sort de magicien de niveau 1 à 5 qui inflige des dégâts, il inflige le maximum ce tour-ci. La première fois est gratuite ; chaque fois suivante avant un repos long, tu subis 2d12 dégâts nécrotiques par niveau du sort, de plus en plus (ignore résistance et immunité).", () => 1]]},
+    {k:"illusionniste", n:"Illusionniste", re:/illusion/,
+      sp:{3:[["Illusion mineure",0]], 6:[["Invocation de bête",2,"c"],["Invocation de fée",3,"c"]]},
+      f:[[3, "Savant en illusion", "other", () => "Ajoute gratuitement deux sorts d'illusion de niveau 2 ou moins à ton grimoire, puis un de plus à chaque nouveau niveau d'emplacements."],
+        [3, "Illusions améliorées", "other", () => "Tes sorts d'illusion se lancent sans composante verbale, et leur portée gagne 18 m si elle est d'au moins 3 m. Tu connais Illusion mineure, qui peut créer un son et une image à la fois, et que tu lances en action bonus."],
+        [6, "Créatures fantasmagoriques", "other", () => "Invocation de bête et Invocation de fée sont toujours préparées et peuvent être des illusions. Une fois par repos long, lance l'un d'eux sans emplacement : la créature a alors la moitié de ses PV.", () => 1],
+        [10, "Double illusoire", "reaction", () => "Quand une attaque te touche, elle te rate à la place. Une fois par repos court, ou en dépensant un emplacement de niveau 2 ou plus.", () => 1, () => "short"],
+        [14, "Réalité illusoire", "bonus", () => "Quand tu lances un sort d'illusion avec un emplacement, rends réel pendant 1 minute un objet inanimé et non magique qui en fait partie. Il ne peut pas infliger de dégâts ni imposer d'état."]]}
+  ]
+};
+const SUB_LEVEL = 3;   // niveau de classe où l'on choisit sa sous-classe
+function subOf(k){
+  const list = SUBCLASSES[norm(k.name)], t = norm(k.subclass);
+  return (list && t && list.find(s => s.re.test(t))) || null;
+}
+function hasSub(c, cls, key, lv){
+  return c.classes.some(k => norm(k.name) === cls && k.level >= (lv || 0) && (subOf(k) || {}).k === key);
+}
+// Ajoute, met à jour ou retire les capacités et sorts de sous-classe selon les classes et niveaux.
+// Les éléments gérés portent un src ; ceux que l'utilisateur supprime sont mémorisés dans srcOff.
+function syncSubclass(c){
+  const m = {}; for (const a of ABILITIES) m[a.k] = Math.floor((c.abilities[a.k] - 10) / 2);
+  const feats = new Map(), spells = new Map();
+  for (const k of c.classes){
+    const cls = norm(k.name), S = subOf(k), lv = k.level;
+    if (!S || lv < SUB_LEVEL) continue;
+    const pre = "sub:" + cls + ":" + S.k + ":";
+    for (const [l, name, time, desc, uses, rech] of S.f) if (lv >= l)
+      feats.set(pre + slug(name), {name, time, desc: S.n + ". " + desc(lv, m), max: uses ? uses(lv, m) : 0, recharge: rech ? rech(lv) : "long"});
+    for (const [l, list] of Object.entries(S.sp || {})) if (lv >= +l)
+      for (const [name, level, fl = ""] of list) spells.set(pre + "sp:" + slug(name), {name, level, fl});
+  }
+  const off = new Set(c.srcOff);
+  c.combat.features = c.combat.features.filter(f => !f.src || feats.has(f.src));
+  for (const [src, x] of feats){
+    if (off.has(src)) continue;
+    const f = c.combat.features.find(y => y.src === src);
+    if (f) Object.assign(f, normFeature(Object.assign({}, f, x)));
+    else c.combat.features.push(normFeature(Object.assign({src}, x)));
+  }
+  // Un sort de sous-classe dont on a écrit la description reste sur la fiche, sans être toujours préparé.
+  c.spells = c.spells.filter(s => {
+    if (!s.src || spells.has(s.src)) return true;
+    if (s.description){ s.src = ""; s.always = false; return true; }
+    return false;
+  });
+  for (const [src, x] of spells){
+    if (off.has(src)) continue;
+    const s = c.spells.find(y => y.src === src) || c.spells.find(y => !y.src && norm(y.name) === norm(x.name));
+    if (s){ s.src = src; s.always = true; continue; }
+    c.spells.push(normSpell({src, name: x.name, level: x.level, always: true, concentration: x.fl.includes("c"),
+      time: x.fl.includes("b") ? "bonus" : x.fl.includes("r") ? "reaction" : "action"}));
+  }
+}
+
 /* --- Sac et états --- */
 const COINS = [["pp","Pièces de platine"],["po","Pièces d'or"],["pe","Pièces d'électrum"],["pa","Pièces d'argent"],["pc","Pièces de cuivre"]];
 const COIN_PO = {pp:10, po:1, pe:0.5, pa:0.1, pc:0.01};
@@ -556,7 +685,8 @@ function defaults(){
     inventory: [],                   // objets du sac
     money: {pp:0, po:0, pe:0, pa:0, pc:0},
     hitDice: {},                     // taille du dé -> dés dépensés
-    conditions: []                   // états actifs
+    conditions: [],                  // états actifs
+    srcOff: []                       // éléments de sous-classe supprimés par l'utilisateur
   };
 }
 function migrate(raw){
@@ -590,6 +720,8 @@ function migrate(raw){
   c.conditions = CONDITIONS.map(x => x.k).filter(k => rcd.includes(k));
   const rp = (raw && raw.profs) || {};
   c.profs = {}; for (const [k] of PROF_FIELDS) c.profs[k] = String(rp[k] ?? "").trim().slice(0, 2000);
+  c.srcOff = (Array.isArray(raw && raw.srcOff) ? raw.srcOff : []).map(String);
+  syncSubclass(c);
   c.schema = SCHEMA;
   return c;
 }
@@ -602,7 +734,8 @@ function normSpell(s){
     castTime: str("castTime"), time: TIMES.some(t => t[0] === s.time) ? s.time : "action",
     range: str("range"), components: str("components"), duration: str("duration"),
     concentration: !!s.concentration, ritual: !!s.ritual, prepared: !!s.prepared, always: !!s.always,
-    description: String(s.description ?? "").trim(), higher: String(s.higher ?? "").trim()
+    description: String(s.description ?? "").trim(), higher: String(s.higher ?? "").trim(),
+    src: str("src")               // sort ajouté par une sous-classe
   };
 }
 function normCombat(rc){
@@ -648,7 +781,9 @@ function normFeature(f){
     time: FEAT_TIMES.some(t => t[0] === f.time) ? f.time : "other",
     max, used: clamp(parseInt(f.used) || 0, 0, max),
     recharge: RECHARGE[f.recharge] ? f.recharge : "long",
-    desc: String(f.desc ?? "").trim()
+    desc: String(f.desc ?? "").trim(),
+    src: String(f.src ?? "")       // capacité gérée par une sous-classe
+
   };
 }
 const numIn = v => { const n = parseFloat(String(v ?? "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
@@ -772,6 +907,8 @@ function derive(c){
       best = {v: 10 + m.dex + m.con, p: [["Défense sans armure (barbare)", 10], ["Mod. Dextérité", m.dex], ["Mod. Constitution", m.con]]};
     if (cls.includes("moine") && !cb.shield && 10 + m.dex + m.sag > best.v)
       best = {v: 10 + m.dex + m.sag, p: [["Défense sans armure (moine)", 10], ["Mod. Dextérité", m.dex], ["Mod. Sagesse", m.sag]]};
+    if (hasSub(c, "barde", "danse", SUB_LEVEL) && !cb.shield && 10 + m.dex + m.cha > best.v)
+      best = {v: 10 + m.dex + m.cha, p: [["Jeu de jambes éblouissant (danse)", 10], ["Mod. Dextérité", m.dex], ["Mod. Charisme", m.cha]]};
     acCalc = best.v; acParts = best.p;
   }
   if (cb.shield){ acCalc += 2 + cb.shieldMagic; acParts.push(["Bouclier", 2 + cb.shieldMagic]); }
@@ -816,7 +953,7 @@ function persist(){
   }, 250);
 }
 function current(){ return chars.find(c => c.id === view.id); }
-function touch(c){ c.updatedAt = Date.now(); persist(); }
+function touch(c){ syncSubclass(c); c.updatedAt = Date.now(); persist(); }
 
 /* ================= Thème ================= */
 function applyTheme(t){
@@ -1049,7 +1186,9 @@ function sheetIdentity(draft){
       <label class="field" style="margin:0"><span>Classe</span><input class="input" data-k="name" value="${esc(k.name)}" list="dl-classes" autocomplete="off"></label>
       <label class="field" style="margin:0"><span>Niveau</span><input class="input" data-k="level" type="number" inputmode="numeric" min="1" max="20" value="${k.level}"></label>
       ${draft.classes.length > 1 ? `<button type="button" class="btn btn-quiet" data-action="rm-class" data-i="${i}" aria-label="Retirer cette classe">✕</button>` : "<span></span>"}
-      <label class="field sub" style="margin:0"><span>Sous-classe</span><input class="input" data-k="subclass" value="${esc(k.subclass)}" autocomplete="off"></label>
+      <label class="field sub" style="margin:0"><span>Sous-classe</span><input class="input" data-k="subclass" value="${esc(k.subclass)}" list="dl-sub-${i}" autocomplete="off">
+        <small class="hint" data-subhint>${subHint(k)}</small></label>
+      <datalist id="dl-sub-${i}">${subOptions(k.name)}</datalist>
     </div>`).join("");
   openSheet(`
     <h2>Modifier le personnage</h2>
@@ -1078,6 +1217,14 @@ function sheetIdentity(draft){
       ${datalists()}
     </form>`, panel => {
     const form = panel.querySelector("#f-id");
+    // Les suggestions et l'aide suivent la classe et le niveau saisis.
+    form.addEventListener("input", e => {
+      const r = e.target.closest(".class-row"); if (!r) return;
+      const k = {name: r.querySelector('[data-k="name"]').value, level: parseInt(r.querySelector('[data-k="level"]').value) || 1,
+        subclass: r.querySelector('[data-k="subclass"]').value};
+      if (e.target.dataset.k === "name") r.querySelector("datalist").innerHTML = subOptions(k.name);
+      r.querySelector("[data-subhint]").textContent = subHint(k);
+    });
     const read = () => {
       const f = new FormData(form);
       draft.name = String(f.get("name")).trim();
@@ -1108,6 +1255,15 @@ function sheetIdentity(draft){
       touch(chars[idx]); closeSheet(); render();
     });
   });
+}
+function subOptions(name){
+  return (SUBCLASSES[norm(name)] || []).map(x => `<option value="${esc(x.n)}">`).join("");
+}
+function subHint(k){
+  const list = SUBCLASSES[norm(k.name)]; if (!list) return "";
+  const S = subOf(k);
+  if (!S) return norm(k.subclass) ? "Sous-classe non reconnue : ses capacités ne seront pas ajoutées." : "Choisis parmi les suggestions pour ajouter ses capacités et ses sorts.";
+  return k.level < SUB_LEVEL ? `${S.n} : capacités ajoutées au niveau ${SUB_LEVEL}.` : `${S.n} : capacités et sorts ajoutés automatiquement.`;
 }
 function sheetDelete(){
   const c = current(); if (!c) return;
@@ -1394,7 +1550,7 @@ function spellItem(c, s){
       : (s.concentration && !isConc ? `<button class="btn btn-primary" data-action="spell-cast" data-id="${s.id}">Se concentrer</button>` : "");
     body = `<div class="spell-body">
       ${facts ? `<dl class="spell-facts">${facts}</dl>` : ""}
-      <div class="spell-desc">${paras(s.description) || `<p class="hint">Pas de description.</p>`}${up}</div>
+      <div class="spell-desc">${paras(s.description) || `<p class="hint">${s.src ? "Sort de sous-classe, toujours préparé. Colle sa description avec Modifier." : "Pas de description."}</p>`}${up}</div>
       <div class="spell-actions">
         ${cast}
         <button class="btn" data-action="spell-edit" data-id="${s.id}">Modifier</button>
@@ -1562,7 +1718,7 @@ function sheetSpellForm(s, opts){
         castTime: el.castTime.value, time: el.time.value, range: el.range.value, duration: el.duration.value,
         components: el.components.value, concentration: el.concentration.checked, ritual: el.ritual.checked,
         prepared: el.prepared.checked, always: el.always.checked,
-        description: el.description.value, higher: el.higher.value
+        description: el.description.value, higher: el.higher.value, src: s.src
       });
       if (!ns.name){ toast("Donne un nom au sort."); return; }
       const i = c.spells.findIndex(x => x.id === ns.id);
@@ -1586,6 +1742,7 @@ function sheetDeleteSpell(id){
     </div>`, panel => {
     panel.querySelector("#del-spell").addEventListener("click", () => {
       c.spells = c.spells.filter(x => x.id !== id);
+      if (s.src) c.srcOff.push(s.src);
       if (c.concentration && c.concentration.id === id) c.concentration = null;
       touch(c); closeSheet(); render(); toast("Sort supprimé.");
     });
@@ -1767,6 +1924,7 @@ function attacksPerAction(c){
     const x = norm(k.name);
     if (x === "guerrier") n = Math.max(n, k.level >= 20 ? 4 : k.level >= 11 ? 3 : k.level >= 5 ? 2 : 1);
     else if (["barbare","paladin","rodeur","moine"].includes(x) && k.level >= 5) n = Math.max(n, 2);
+    else if (x === "barde" && k.level >= 6 && (subOf(k) || {}).k === "vaillance") n = Math.max(n, 2);
   }
   return n;
 }
@@ -2016,9 +2174,10 @@ function featItem(f){
       <button class="btn btn-quiet" data-action="feat-use" data-id="${f.id}" data-spend="-1" aria-label="Récupérer une utilisation de ${name}" ${f.used ? "" : "disabled"}>+</button>`;
   }
   const body = open ? `<div class="spell-body">
-      <div class="spell-desc">${paras(f.desc) || `<p class="hint">Pas de description.</p>`}</div>
+      <div class="spell-desc">${paras(f.desc) || `<p class="hint">Pas de description.</p>`}
+        ${f.src ? `<p class="hint">Ajoutée par ta sous-classe, elle suit ton niveau et tes caractéristiques. Si tu la supprimes, elle ne reviendra pas.</p>` : ""}</div>
       <div class="spell-actions">
-        <button class="btn" data-action="feat-edit" data-id="${f.id}">Modifier</button>
+        ${f.src ? "" : `<button class="btn" data-action="feat-edit" data-id="${f.id}">Modifier</button>`}
         <button class="btn btn-quiet" data-action="feat-del" data-id="${f.id}">Supprimer</button>
       </div></div>` : "";
   return `<li class="spell"><div class="spell-row">
@@ -2113,7 +2272,7 @@ function sheetArmor(){
       <div class="cols">${num("armorMagic", "Bonus magique de l'armure", cb.armorMagic, -5, 5)}${num("shieldMagic", "Bonus magique du bouclier", cb.shieldMagic, -5, 5)}</div>
       <label class="check"><input type="checkbox" name="shield" ${cb.shield ? "checked" : ""}> Bouclier (+2)</label>
       ${num("acMisc", "Autres bonus à la CA", cb.acMisc, -10, 10)}
-      <p class="hint">Style de combat Défense, anneau de protection… Sans armure, Miroir applique la Défense sans armure du barbare ou du moine. Pour un sort comme Armure du mage, force la CA en touchant sa valeur.</p>
+      <p class="hint">Style de combat Défense, anneau de protection… Sans armure, Miroir applique la Défense sans armure du barbare, du moine ou du Collège de la Danse. Pour un sort comme Armure du mage, force la CA en touchant sa valeur.</p>
       <div class="actions">
         <button type="button" class="btn" data-action="close">Annuler</button>
         <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -2829,7 +2988,7 @@ const actions = {
   "feat-del": t => {
     const c = current(); const f = c.combat.features.find(x => x.id === t.dataset.id); if (!f) return;
     sheetConfirm(`Supprimer « ${esc(f.name) || "Capacité sans nom"} » ?`, "La capacité sera retirée de la fiche.", "Garder la capacité", "Supprimer", () => {
-      c.combat.features = c.combat.features.filter(x => x.id !== f.id); touch(c); closeSheet(); render(); toast("Capacité supprimée.");
+      c.combat.features = c.combat.features.filter(x => x.id !== f.id); if (f.src) c.srcOff.push(f.src); touch(c); closeSheet(); render(); toast("Capacité supprimée.");
     });
   },
   "feat-use": t => {
