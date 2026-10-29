@@ -279,6 +279,7 @@ div.spell-open{ cursor:default; }
 .feat-pips{ display:flex; flex-wrap:wrap; align-items:center; margin:-.35rem 0 .25rem; }
 .feat-count{ color:var(--ink-soft); font-size:1rem; padding:0 .5rem; }
 .feat-pips .btn-quiet{ min-width:44px; font-size:1.3rem; }
+.feat-pips .pool-use{ font-size:1rem; text-decoration:underline; text-underline-offset:3px; padding-left:.25rem; }
 .rest-btns{ display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
 .warn{ color:var(--blood-ink); font-style:italic; }
 .t-short{ display:none; }
@@ -482,56 +483,56 @@ const STD_ACTIONS = [
 ];
 const DTYPES = ["acide","contondants","feu","force","foudre","froid","nécrotiques","perforants","poison","psychiques","radiants","tonnerre","tranchants"];
 const FEAT_TIMES = [["action","Action"],["bonus","Action bonus"],["reaction","Réaction"],["other","Hors combat (onglet Carac.)"]];
-const RECHARGE = {short:"Repos court", long:"Repos long", none:"Ne se recharge pas"};
+const RECHARGE = {short:"Repos court", short1:"Une au repos court, toutes au repos long", long:"Repos long", none:"Ne se recharge pas"};
 
 /* --- Sous-classes (règles 2024) --- */
 // Par classe : re reconnaît le texte saisi ; sp : sorts toujours préparés par niveau de classe [nom, niveau, marques]
 // (c concentration, b action bonus, r réaction) ; f : capacités [niveau, nom, moment, texte(lv, m), utilisations(lv, m), recharge(lv)]
-const SUB_CD = "Utilise une charge de Conduit divin.";
+const SUB_CD = "Dépense une charge de Conduit divin.";
 const SUBCLASSES = {
   clerc: [
     {k:"vie", n:"Domaine de la Vie", re:/vie|life/,
       sp:{3:[["Aide",2],["Bénédiction",1,"c"],["Soins",1],["Restauration partielle",2,"b"]], 5:[["Mot de guérison de groupe",3,"b"],["Retour à la vie",3]],
         7:[["Aura de vie",4,"c"],["Protection contre la mort",4]], 9:[["Restauration supérieure",5],["Soins de groupe",5]]},
       f:[[3, "Disciple de la vie", "other", () => "Quand un sort lancé avec un emplacement rend des points de vie, la cible récupère en plus 2 + le niveau de l'emplacement, au moment où le sort la soigne."],
-        [3, "Préservation de la vie", "action", lv => `${SUB_CD} Rends jusqu'à ${5 * lv} PV (5 × ton niveau de clerc), répartis entre des créatures En sang à 9 m ou moins. Une créature ne peut pas dépasser la moitié de ses PV maximum ainsi.`],
+        [3, "Préservation de la vie", "action", lv => `${SUB_CD} Rends jusqu'à ${5 * lv} PV (5 × ton niveau de clerc), répartis entre des créatures En sang à 9 m ou moins. Une créature ne peut pas dépasser la moitié de ses PV maximum ainsi.`, null, null, "cd"],
         [6, "Guérisseur béni", "other", () => "Quand tu lances un sort avec un emplacement qui rend des PV à une autre créature, tu récupères 2 + le niveau de l'emplacement."],
         [17, "Guérison suprême", "other", () => "Quand tu lances des dés pour rendre des PV avec un sort ou un Conduit divin, chaque dé donne son maximum."]]},
     {k:"lumiere", n:"Domaine de la Lumière", re:/lumiere|light/,
       sp:{3:[["Mains brûlantes",1],["Lueurs féeriques",1,"c"],["Rayon ardent",2],["Voir l'invisible",2]], 5:[["Lumière du jour",3],["Boule de feu",3]],
         7:[["Œil magique",4,"c"],["Mur de feu",4,"c"]], 9:[["Colonne de flamme",5],["Scrutation",5,"c"]]},
-      f:[[3, "Radiance de l'aube", "action", lv => `${SUB_CD} Dissipe les ténèbres magiques à 9 m. Chaque créature de ton choix à 9 m fait une sauvegarde de Constitution contre ton DD de sorts : 2d10 + ${lv} dégâts radiants, la moitié si elle réussit.`],
+      f:[[3, "Radiance de l'aube", "action", lv => `${SUB_CD} Dissipe les ténèbres magiques à 9 m. Chaque créature de ton choix à 9 m fait une sauvegarde de Constitution contre ton DD de sorts : 2d10 + ${lv} dégâts radiants, la moitié si elle réussit.`, null, null, "cd"],
         [3, "Lueur protectrice", "reaction", (lv, m) => `Quand une créature que tu vois à 9 m ${lv >= 6 ? "attaque toi ou une autre créature" : "t'attaque"}, impose-lui le Désavantage à ce jet d'attaque.` + (lv >= 6 ? ` La cible de l'attaque gagne 2d6 ${sign(m.sag)} PV temporaires.` : ""), (lv, m) => Math.max(1, m.sag), lv => lv >= 6 ? "short" : "long"],
         [17, "Halo de lumière", "action", () => "Pendant 1 minute, tu émets une lumière vive sur 18 m et faible sur 9 m de plus. Tes ennemis dans la lumière vive ont le Désavantage aux sauvegardes contre ta Radiance de l'aube et tes sorts de feu ou radiants.", (lv, m) => Math.max(1, m.sag)]]},
     {k:"duperie", n:"Domaine de la Duperie", re:/duperie|ruse|tromp|trick/,
       sp:{3:[["Charme-personne",1],["Déguisement",1],["Invisibilité",2,"c"],["Passage sans trace",2,"c"]], 5:[["Motif hypnotique",3,"c"],["Antidétection",3]],
         7:[["Confusion",4,"c"],["Porte dimensionnelle",4]], 9:[["Domination de personne",5,"c"],["Modification de mémoire",5,"c"]]},
       f:[[3, "Bénédiction de l'escroc", "action", () => "Toi ou une créature consentante à 9 m avez l'Avantage aux tests de Dextérité (Discrétion) jusqu'à ton prochain repos long ou jusqu'à ce que tu la donnes à nouveau."],
-        [3, "Invocation de duplicité", "bonus", lv => `${SUB_CD} Crée une illusion parfaite de toi à 9 m pendant 1 minute. Tu peux lancer tes sorts depuis son emplacement. Tu as l'Avantage pour attaquer une créature située à 1,5 m de toi et de l'illusion. Action bonus : déplace-la de 9 m.` + (lv >= 17 ? " Tes alliés ont aussi l'Avantage contre une créature à 1,5 m de l'illusion ; quand elle prend fin, toi ou une créature à 1,5 m d'elle récupérez " + lv + " PV." : "")],
+        [3, "Invocation de duplicité", "bonus", lv => `${SUB_CD} Crée une illusion parfaite de toi à 9 m pendant 1 minute. Tu peux lancer tes sorts depuis son emplacement. Tu as l'Avantage pour attaquer une créature située à 1,5 m de toi et de l'illusion. Action bonus : déplace-la de 9 m.` + (lv >= 17 ? " Tes alliés ont aussi l'Avantage contre une créature à 1,5 m de l'illusion ; quand elle prend fin, toi ou une créature à 1,5 m d'elle récupérez " + lv + " PV." : ""), null, null, "cd"],
         [6, "Transposition de l'escroc", "other", () => "Quand tu crées ou déplaces ton illusion, tu peux échanger ta place avec elle par téléportation."]]},
     {k:"guerre", n:"Domaine de la Guerre", re:/guerre|war/,
       sp:{3:[["Éclair traçant",1],["Arme magique",2,"b"],["Bouclier de la foi",1,"bc"],["Arme spirituelle",2,"bc"]], 5:[["Aura du croisé",3,"c"],["Esprits gardiens",3,"c"]],
         7:[["Bouclier de feu",4],["Liberté de mouvement",4]], 9:[["Immobilisation de monstre",5,"c"],["Frappe du vent d'acier",5]]},
       f:[[3, "Prêtre de guerre", "bonus", () => "Fais une attaque avec une arme ou à mains nues.", (lv, m) => Math.max(1, m.sag), () => "short"],
-        [3, "Frappe guidée", "reaction", () => `${SUB_CD} Quand toi ou une créature à 9 m ratez un jet d'attaque, ajoute +10 au jet. Pour une autre créature, cela prend ta Réaction.`],
-        [6, "Bénédiction du dieu de la guerre", "bonus", () => `${SUB_CD} Lance Bouclier de la foi ou Arme spirituelle sans emplacement ni Concentration : le sort dure 1 minute.`],
+        [3, "Frappe guidée", "reaction", () => `${SUB_CD} Quand toi ou une créature à 9 m ratez un jet d'attaque, ajoute +10 au jet. Pour une autre créature, cela prend ta Réaction.`, null, null, "cd"],
+        [6, "Bénédiction du dieu de la guerre", "bonus", () => `${SUB_CD} Lance Bouclier de la foi ou Arme spirituelle sans emplacement ni Concentration : le sort dure 1 minute.`, null, null, "cd"],
         [17, "Avatar de bataille", "other", () => "Résistance aux dégâts contondants, perforants et tranchants."]]}
   ],
   barde: [
     {k:"savoir", n:"Collège du Savoir", re:/savoir|lore/,
       f:[[3, "Maîtrises supplémentaires", "other", () => "Tu gagnes la maîtrise de trois compétences de ton choix. Coche-les dans l'onglet Caractéristiques."],
-        [3, "Mots cinglants", "reaction", () => "Quand une créature que tu vois à 18 m réussit un test ou un jet d'attaque, ou fait un jet de dégâts, dépense une Inspiration bardique : lance le dé et retire le résultat de son jet."],
+        [3, "Mots cinglants", "reaction", () => "Quand une créature que tu vois à 18 m réussit un test ou un jet d'attaque, ou fait un jet de dégâts, dépense une Inspiration bardique : lance le dé et retire le résultat de son jet.", null, null, "insp"],
         [6, "Découvertes magiques", "other", () => "Apprends deux sorts de ton choix des listes du clerc, du druide ou du magicien. Ils sont toujours préparés et comptent comme des sorts de barde. Ajoute-les dans l'onglet Sorts."],
-        [14, "Talent sans égal", "other", () => "Quand tu rates un test de caractéristique ou un jet d'attaque, dépense une Inspiration bardique et ajoute le dé au jet. Si tu échoues quand même, l'Inspiration n'est pas dépensée."]]},
+        [14, "Talent sans égal", "other", () => "Quand tu rates un test de caractéristique ou un jet d'attaque, dépense une Inspiration bardique et ajoute le dé au jet. Si tu échoues quand même, l'Inspiration n'est pas dépensée.", null, null, "insp"]]},
     {k:"danse", n:"Collège de la Danse", re:/danse|dance/,
       f:[[3, "Jeu de jambes éblouissant", "other", (lv, m) => `Sans armure ni bouclier : Avantage aux tests de Représentation où tu danses ; CA de 10 + Dex + Cha (${10 + m.dex + m.cha}), appliquée automatiquement ; quand tu dépenses une Inspiration bardique dans une action, une action bonus ou une réaction, tu peux faire une attaque à mains nues dans le cadre de celle-ci. Tes attaques à mains nues utilisent la Dextérité et infligent le dé d'Inspiration bardique ${sign(m.dex)} dégâts contondants, sans le dépenser.`],
-        [6, "Coordination de groupe", "other", () => "Quand tu lances l'initiative, dépense une Inspiration bardique : lance le dé, toi et tes alliés à 9 m ajoutez le résultat à votre initiative."],
-        [6, "Mouvement inspirant", "reaction", () => "Quand un ennemi que tu vois termine son tour à 1,5 m de toi, dépense une Inspiration bardique : déplace-toi de la moitié de ta Vitesse sans provoquer d'attaque d'opportunité. Un allié à 9 m peut utiliser sa Réaction pour faire de même."],
+        [6, "Coordination de groupe", "other", () => "Quand tu lances l'initiative, dépense une Inspiration bardique : lance le dé, toi et tes alliés à 9 m ajoutez le résultat à votre initiative.", null, null, "insp"],
+        [6, "Mouvement inspirant", "reaction", () => "Quand un ennemi que tu vois termine son tour à 1,5 m de toi, dépense une Inspiration bardique : déplace-toi de la moitié de ta Vitesse sans provoquer d'attaque d'opportunité. Un allié à 9 m peut utiliser sa Réaction pour faire de même.", null, null, "insp"],
         [14, "Esquive menée", "other", () => "Quand une sauvegarde de Dextérité réussie te ferait subir la moitié des dégâts, tu n'en subis aucun, et seulement la moitié en cas d'échec. Les créatures à 1,5 m de toi en profitent aussi. Pas si tu es Neutralisé."]]},
     {k:"glamour", n:"Collège du Glamour", re:/glamour|seduc|eclat/,
       sp:{3:[["Charme-personne",1],["Image miroir",2]]},
       f:[[3, "Magie ensorcelante", "other", () => "Après avoir lancé un sort d'enchantement ou d'illusion avec un emplacement, une créature que tu vois à 18 m fait une sauvegarde de Sagesse contre ton DD de sorts. Échec : elle est Charmée ou Effrayée (au choix) pendant 1 minute, et refait la sauvegarde à la fin de chacun de ses tours. Une fois par repos long, ou en dépensant une Inspiration bardique.", () => 1],
-        [3, "Manteau d'inspiration", "bonus", (lv, m) => `Dépense une Inspiration bardique et lance le dé. Jusqu'à ${Math.max(1, m.cha)} créatures à 18 m gagnent chacune deux fois le résultat en PV temporaires, et peuvent utiliser leur Réaction pour se déplacer de leur Vitesse sans provoquer d'attaque d'opportunité.`],
+        [3, "Manteau d'inspiration", "bonus", (lv, m) => `Dépense une Inspiration bardique et lance le dé. Jusqu'à ${Math.max(1, m.cha)} créatures à 18 m gagnent chacune deux fois le résultat en PV temporaires, et peuvent utiliser leur Réaction pour se déplacer de leur Vitesse sans provoquer d'attaque d'opportunité.`, null, null, "insp"],
         [6, "Manteau de majesté", "bonus", () => "Lance Injonction sans emplacement, puis pendant 1 minute (Concentration), relance-le à chaque tour en action bonus sans emplacement. Une créature que tu as Charmée échoue automatiquement à la sauvegarde. Une fois par repos long, ou avec un emplacement de niveau 3 ou plus.", () => 1],
         [14, "Majesté inébranlable", "bonus", () => "Pendant 1 minute, la première fois à chaque tour qu'une créature t'attaque, elle fait une sauvegarde de Charisme contre ton DD de sorts. Échec : l'attaque te rate.", () => 1, () => "short"]]},
     {k:"vaillance", n:"Collège de la Vaillance", re:/vaillance|valeur|valor/,
@@ -568,6 +569,25 @@ const SUBCLASSES = {
         [14, "Réalité illusoire", "bonus", () => "Quand tu lances un sort d'illusion avec un emplacement, rends réel pendant 1 minute un objet inanimé et non magique qui en fait partie. Il ne peut pas infliger de dégâts ni imposer d'état."]]}
   ]
 };
+// Capacités de classe gérées, même format ; pool : réserve dépensée par la capacité (POOLS)
+const insDie = lv => lv >= 15 ? "d12" : lv >= 10 ? "d10" : lv >= 5 ? "d8" : "d6";
+const CLASS_FEATS = {
+  barde: [
+    [1, "Inspiration bardique", "bonus", (lv, m) => `Donne un dé d'Inspiration bardique (${insDie(lv)}) à une créature à 18 m qui te voit ou t'entend. Pendant 1 heure, quand elle rate un test d20, elle peut lancer le dé et l'ajouter, ce qui peut changer l'échec en réussite. Elle ne peut en avoir qu'un à la fois.`
+      + (lv >= 5 ? " Source d'inspiration : tes utilisations reviennent aussi au repos court, et tu peux dépenser un emplacement de sort pour en récupérer une." : "")
+      + (lv >= 18 ? " Inspiration supérieure : quand tu lances l'initiative, tu remontes à deux utilisations si tu en as moins." : ""),
+      (lv, m) => Math.max(1, m.cha), lv => lv >= 5 ? "short" : "long"]
+  ],
+  clerc: [
+    [2, "Conduit divin", "action", lv => `Une charge sert à une option : Étincelle divine, Renvoi des morts-vivants ou celles de ton domaine. Tu récupères une charge au repos court, toutes au repos long.`,
+      lv => lv >= 18 ? 4 : lv >= 6 ? 3 : 2, () => "short1"],
+    [2, "Étincelle divine", "action", (lv, m) => `Vise une créature à 9 m : rends-lui ${lv >= 18 ? 4 : lv >= 13 ? 3 : lv >= 7 ? 2 : 1}d8 ${sign(m.sag)} PV, ou inflige-lui autant de dégâts radiants ou nécrotiques (au choix) si elle rate une sauvegarde de Constitution contre ton DD de sorts, la moitié si elle la réussit.`, null, null, "cd"],
+    [2, "Renvoi des morts-vivants", "action", (lv, m) => `Chaque mort-vivant de ton choix à 9 m fait une sauvegarde de Sagesse contre ton DD de sorts. Échec : il est Effrayé et Neutralisé pendant 1 minute, et s'éloigne de toi le plus possible ; l'effet cesse s'il subit des dégâts.`
+      + (lv >= 5 ? ` Incinération des morts-vivants : chaque mort-vivant qui échoue subit ${Math.max(1, m.sag)}d8 dégâts radiants, sans mettre fin à l'effet.` : ""), null, null, "cd"]
+  ]
+};
+// Réserves : clé -> capacité de classe dont on dépense une utilisation
+const POOLS = {cd: "cls:clerc:conduit-divin", insp: "cls:barde:inspiration-bardique"};   // src = "cls:" + classe + ":" + slug(nom)
 const SUB_LEVEL = 3;   // niveau de classe où l'on choisit sa sous-classe
 function subOf(k){
   const list = SUBCLASSES[norm(k.name)], t = norm(k.subclass);
@@ -578,15 +598,20 @@ function hasSub(c, cls, key, lv){
 }
 // Ajoute, met à jour ou retire les capacités et sorts de sous-classe selon les classes et niveaux.
 // Les éléments gérés portent un src ; ceux que l'utilisateur supprime sont mémorisés dans srcOff.
-function syncSubclass(c){
+function syncAuto(c){
   const m = {}; for (const a of ABILITIES) m[a.k] = Math.floor((c.abilities[a.k] - 10) / 2);
   const feats = new Map(), spells = new Map();
+  const add = (pre, label, list, lv) => {
+    for (const [l, name, time, desc, uses, rech, pool] of list) if (lv >= l)
+      feats.set(pre + slug(name), {name, time, desc: (label ? label + ". " : "") + desc(lv, m), max: uses ? uses(lv, m) : 0,
+        recharge: rech ? rech(lv) : "long", pool: pool || ""});
+  };
   for (const k of c.classes){
     const cls = norm(k.name), S = subOf(k), lv = k.level;
+    add("cls:" + cls + ":", "", CLASS_FEATS[cls] || [], lv);
     if (!S || lv < SUB_LEVEL) continue;
     const pre = "sub:" + cls + ":" + S.k + ":";
-    for (const [l, name, time, desc, uses, rech] of S.f) if (lv >= l)
-      feats.set(pre + slug(name), {name, time, desc: S.n + ". " + desc(lv, m), max: uses ? uses(lv, m) : 0, recharge: rech ? rech(lv) : "long"});
+    add(pre, S.n, S.f, lv);
     for (const [l, list] of Object.entries(S.sp || {})) if (lv >= +l)
       for (const [name, level, fl = ""] of list) spells.set(pre + "sp:" + slug(name), {name, level, fl});
   }
@@ -721,7 +746,7 @@ function migrate(raw){
   const rp = (raw && raw.profs) || {};
   c.profs = {}; for (const [k] of PROF_FIELDS) c.profs[k] = String(rp[k] ?? "").trim().slice(0, 2000);
   c.srcOff = (Array.isArray(raw && raw.srcOff) ? raw.srcOff : []).map(String);
-  syncSubclass(c);
+  syncAuto(c);
   c.schema = SCHEMA;
   return c;
 }
@@ -782,7 +807,8 @@ function normFeature(f){
     max, used: clamp(parseInt(f.used) || 0, 0, max),
     recharge: RECHARGE[f.recharge] ? f.recharge : "long",
     desc: String(f.desc ?? "").trim(),
-    src: String(f.src ?? "")       // capacité gérée par une sous-classe
+    src: String(f.src ?? ""),      // capacité gérée par une classe ou une sous-classe
+    pool: POOLS[f.pool] ? f.pool : ""   // réserve dépensée (Conduit divin, Inspiration bardique)
 
   };
 }
@@ -953,7 +979,7 @@ function persist(){
   }, 250);
 }
 function current(){ return chars.find(c => c.id === view.id); }
-function touch(c){ syncSubclass(c); c.updatedAt = Date.now(); persist(); }
+function touch(c){ syncAuto(c); c.updatedAt = Date.now(); persist(); }
 
 /* ================= Thème ================= */
 function applyTheme(t){
@@ -2173,9 +2199,14 @@ function featItem(f){
       <span class="feat-count">${left}/${f.max}</span>
       <button class="btn btn-quiet" data-action="feat-use" data-id="${f.id}" data-spend="-1" aria-label="Récupérer une utilisation de ${name}" ${f.used ? "" : "disabled"}>+</button>`;
   }
+  const c = current(), pf = f.pool && c && c.combat.features.find(x => x.src === POOLS[f.pool]);
+  if (pf && pf.max){
+    const pl = pf.max - pf.used, pn = esc(pf.name);
+    pips += `<button class="btn btn-quiet pool-use" data-action="pool-use" data-id="${f.id}" ${pl ? "" : "disabled"} aria-label="${name} : dépenser 1 ${pn}, ${pl} sur ${pf.max} restantes">Utiliser · ${pn} ${pl}/${pf.max}</button>`;
+  }
   const body = open ? `<div class="spell-body">
       <div class="spell-desc">${paras(f.desc) || `<p class="hint">Pas de description.</p>`}
-        ${f.src ? `<p class="hint">Ajoutée par ta sous-classe, elle suit ton niveau et tes caractéristiques. Si tu la supprimes, elle ne reviendra pas.</p>` : ""}</div>
+        ${f.src ? `<p class="hint">Ajoutée automatiquement, elle suit ton niveau et tes caractéristiques. Si tu la supprimes, elle ne reviendra pas.</p>` : ""}</div>
       <div class="spell-actions">
         ${f.src ? "" : `<button class="btn" data-action="feat-edit" data-id="${f.id}">Modifier</button>`}
         <button class="btn btn-quiet" data-action="feat-del" data-id="${f.id}">Supprimer</button>
@@ -2477,8 +2508,8 @@ function shortRest(c, healed){
   const msgs = [];
   if (healed) msgs.push(healed + " PV récupérés");
   if (c.slots.pact){ c.slots.pact = 0; msgs.push("emplacements de pacte récupérés"); }
-  const n = c.combat.features.filter(f => f.recharge === "short" && f.used).length;
-  c.combat.features.forEach(f => { if (f.recharge === "short") f.used = 0; });
+  const n = c.combat.features.filter(f => /^short/.test(f.recharge) && f.used).length;
+  c.combat.features.forEach(f => { if (f.recharge === "short") f.used = 0; else if (f.recharge === "short1") f.used = Math.max(0, f.used - 1); });
   if (n) msgs.push(n > 1 ? n + " capacités rechargées" : "1 capacité rechargée");
   return "Repos court terminé" + (msgs.length ? " : " + frList(msgs) + "." : ".");
 }
@@ -2556,7 +2587,7 @@ function sheetShortRest(){
     const pool = hitDicePool(c);
     const also = [];
     if (c.slots.pact) also.push("tes emplacements de pacte");
-    if (c.combat.features.some(f => f.recharge === "short" && f.used)) also.push("tes capacités de repos court");
+    if (c.combat.features.some(f => /^short/.test(f.recharge) && f.used)) also.push("tes capacités de repos court");
     panel.innerHTML = `
       <h2 tabindex="-1" autofocus>Repos court</h2>
       <p>Chaque dé de vie dépensé te rend son résultat ${sign(con)} (Constitution) en points de vie, au moins 1.</p>
@@ -2990,6 +3021,14 @@ const actions = {
     sheetConfirm(`Supprimer « ${esc(f.name) || "Capacité sans nom"} » ?`, "La capacité sera retirée de la fiche.", "Garder la capacité", "Supprimer", () => {
       c.combat.features = c.combat.features.filter(x => x.id !== f.id); if (f.src) c.srcOff.push(f.src); touch(c); closeSheet(); render(); toast("Capacité supprimée.");
     });
+  },
+  "pool-use": t => {
+    const c = current(); const f = c.combat.features.find(x => x.id === t.dataset.id);
+    const pf = f && c.combat.features.find(x => x.src === POOLS[f.pool]); if (!pf) return;
+    if (pf.used >= pf.max){ toast(`Plus de ${pf.name} disponible.`); return; }
+    pf.used++; touch(c); render();
+    const left = pf.max - pf.used;
+    toast(`${f.name} : ${pf.name} dépensé, ${left ? "il en reste " + left : "plus aucune charge"}.`);
   },
   "feat-use": t => {
     const c = current(); const f = c.combat.features.find(x => x.id === t.dataset.id); if (!f) return;
